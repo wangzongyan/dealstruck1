@@ -87,29 +87,32 @@ n.factor_all <- function(data){
   return(as.data.frame(x[x>0]))
 }
 
-# change the variable earliest_cr_line from date to numeric, begin at jan, 1960
-dateToNum <- function(data){
-  test_that("data should include variable earliest_cr_line", { # should include addr_state
-    expect_equal(is.null(data$earliest_cr_line), F)
+# change the variable var from date to numeric, begin at jan, 1960
+dateToNum <- function(data, var = "earliest_cr_line"){
+  test_that("data should include variable var", { # should include addr_state
+    expect_equal(is.null(data[,var]), F)
   })
-  data$earliest_cr_line <- as.character(data$earliest_cr_line)
+  data[,var] <- as.character(data[,var])
   ## form1 is (x)x-mmm
-  form1 <- grep(pattern = "(\\d+)-(\\w+)", x = data$earliest_cr_line, value = T)
-  form1.index <- grep(pattern = "(\\d+)-(\\w+)", x = data$earliest_cr_line)
+  form1 <- grep(pattern = "(\\d+)-(\\w+)", x = data[,var], value = T)
+  form1.index <- grep(pattern = "(\\d+)-(\\w+)", x = data[,var])
   year1 <- as.numeric(sub(pattern = "(\\d+)-(\\w+)", x = form1, replacement = "\\1"))+2000
   month1 <- sub(pattern = "(\\d+)-(\\w+)", x = form1, replacement = "\\2")
   month1 <- as.numeric(match(month1,month.abb))
   m1 <-  (year1 - 1960)*12 + month1 
+
   ## form 2 is mmm-xx
-  form2 <- grep(pattern = "(\\w+)-(\\d+)", x = data$earliest_cr_line, value = T)
-  form2.index <- grep(pattern = "(\\w+)-(\\d+)", x = data$earliest_cr_line)
+  form2 <- grep(pattern = "(\\w+)-(\\d+)", x = data[,var], value = T)
+  form2.index <- grep(pattern = "(\\w+)-(\\d+)", x = data[,var])
   year2 <- as.numeric(sub(pattern = "(\\w+)-(\\d+)", x = form2, replacement = "\\2"))+1900
   month2 <- sub(pattern = "(\\w+)-(\\d+)", x = form2, replacement = "\\1")
   month2 <- as.numeric(match(month2, month.abb))
   m2 <- (year2 - 1960)*12 + month2
   ## return back m1, m2
-  data$earliest_cr_line[form1.index] <- m1
-  data$earliest_cr_line[form2.index] <- m2
+  m <- c()
+  m[form1.index] <- as.numeric(m1,na.rm = T)
+  m[form2.index] <- as.numeric(m2,na.rm = T)
+  data[,var] <- as.numeric(m)
   return(data)
 }
 

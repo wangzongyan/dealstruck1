@@ -1,7 +1,7 @@
 ---
-title: "data_challenge"
+title: "fitToAll"
 author: "Zongyan Wang"
-date: "March 25, 2016"
+date: "March 28, 2016"
 output: pdf_document
 ---
 # Read data and packages
@@ -40,9 +40,7 @@ lc <- replaceBlank_all(lc) # replace the blank
 lc <- lc %>% dateToNum(., "earliest_cr_line") %>%
   dateToNum(., "issue_d") %>% dateToNum(., "last_pymnt_d")  
 
-lc <- lc %>% select(-id,  -emp_title,
-                    -last_pymnt_d, -next_pymnt_d, -last_pymnt_amnt,
-                    -zip_code,-issue_d, -last_credit_pull_d)
+lc <- lc %>% select(-id,  -emp_title,-zip_code)
 ```
 # Data Summary
 ```{r}
@@ -62,7 +60,7 @@ anova.p_plot <- anova.p %>% subset(p.value < 0.05) %>%
   geom_hline(yintercept = 0.01, colour = "red", linetype = 3) +
       labs(x = "Variable", y = "p-value", title = "ANOVA p-value")
 anova.p_plot
-ggsave(filename = "anova.p_plot.png", plot = anova.p_plot, path = ".",  
+ggsave(filename = "anova.p_plot1.png", plot = anova.p_plot, path = ".",  
        width = 10, height = 6, dpi = 400)
 sig.names <- as.character((anova.p %>% subset(p.value < 0.01))$var)
 var.names <- c(sig.names, names(n.factor_all(lc)))
@@ -99,18 +97,22 @@ compare.data <- data.frame(pred = pred, true = lc4$y)
 # prediction accuracy when threshold = 0.5
 pred1 = as.numeric(pred > 0.25)
 1 - sum(pred1 == lc4$y, na.rm = T)/length(pred1)
+coeff.plot <- coeff_plot1(log.f, sig = F,sig.value = 0.05)
+ggsave(filename = "FD_coeff_plot1.png", plot = coeff.plot, path = ".",  
+       width = 10, height = 6, dpi = 400)
 # Prediction and true status when threshold = 0.5 plot
 pred_type_plot <- plot_pred_type_distribution(compare.data, 0.5)
 print(pred_type_plot)
-ggsave(filename = "FD_pred_type_plot.png", plot = pred_type_plot, path = ".",  
-       width = 10, height = 6, dpi = 400)
+ggsave(filename = "FD_pred_type_plot1.png", plot = pred_type_plot, path = ".",  
+       width = 15, height = 6, dpi = 400)
+
 # roc, cost of FP = 1, cost of FN = 5 
 # Calculate the roc(FP: pred=1,true=0; FN:pred=0, true=1)
 roc <- calculate_roc(compare.data, 1, 5, n = 100)
 # Plot the roc, cost of FP = 1, cost of FN = 5 
 plot.roc <- plot_roc(roc, 0.5, 1, 5)
 print(plot.roc)
-ggsave(filename = "FD_plot_roc.png", plot = plot.roc, path = ".",  
+ggsave(filename = "FD_plot_roc1.png", plot = plot.roc, path = ".",  
        width = 10, height = 6, dpi = 400)
 
 # out-of-sample prediction accracy
@@ -142,12 +144,15 @@ compare.data <- data.frame(pred = pred, true = lc4$y)
 
 # in-sample prediction accuracy
 # prediction accuracy when threshold = 0.5
-pred1 = as.numeric(pred > 0.14)
+pred1 = as.numeric(pred > 0.5)
 1 - sum(pred1 == lc4$y, na.rm = T)/length(pred1)
+coeff.plot <- coeff_plot1(log.f, sig = F,sig.value = 0.05)
+ggsave(filename = "CD_coeff_plot1.png", plot = coeff.plot, path = ".",  
+       width = 15, height = 6, dpi = 400)
 # Prediction and true status when threshold = 0.5 plot
 pred_type_plot <- plot_pred_type_distribution(compare.data, 0.14)
 print(pred_type_plot)
-ggsave(filename = "CD_pred_type_plot.png", plot = pred_type_plot, path = ".",  
+ggsave(filename = "CD_pred_type_plot1.png", plot = pred_type_plot, path = ".",  
        width = 10, height = 6, dpi = 400)
 # roc, cost of FP = 1, cost of FN = 5 
 # Calculate the roc(FP: pred=1,true=0; FN:pred=0, true=1)
@@ -155,7 +160,7 @@ roc <- calculate_roc(compare.data, 1, 5, n = 100)
 # Plot the roc, cost of FP = 1, cost of FN = 5 
 plot.roc <- plot_roc(roc, 0.5, 1, 5)
 print(plot.roc)
-ggsave(filename = "CD_plot_roc.png", plot = plot.roc, path = ".",  
+ggsave(filename = "CD_plot_roc1.png", plot = plot.roc, path = ".",  
        width = 10, height = 6, dpi = 400)
 
 # out-of-sample prediction accracy
@@ -168,88 +173,4 @@ print(significant_plot)
 coefficient_plot <- coeff_plot1(log.f, sig = F, 0.1)
 print(coefficient_plot)
 
-```
-# Interested in classification between Current and Fully Paid
-```{r}
-lc3 <- as.data.frame(cbind(categorical.list, lc.numeric))
-lc3$loan_status <- lc$loan_status
-# Group the loan_status into 3 groups
-lc3 <- lc3 %>% mutate(y = (loan_status == "Fully_Paid"))
-lc3$y[lc3$loan_status == "Current"] <- 2
-lc3 <- lc3 %>% select(-loan_status)
-
-## Logistic Regression
-lc4 <- lc3 %>% subset(y != 0)
-lc4$y[lc4$y == 2] <- 0 # Fully Paid set to be zero, while potential delinquency events set to be 1
-log.f <- logistic(lc4)
-pred <- predict(log.f, lc4, type = "response")
-# Compare the pred and true value
-compare.data <- data.frame(pred = pred, true = lc4$y)
-
-# in-sample prediction accuracy
-# prediction accuracy when threshold = 0.5
-pred1 = as.numeric(pred > 0.5)
-1 - sum(pred1 == lc4$y, na.rm = T)/length(pred1)
-# Prediction and true status when threshold = 0.5 plot
-pred_type_plot <- plot_pred_type_distribution(compare.data, 0.5)
-print(pred_type_plot)
-ggsave(filename = "FC_pred_type_plot.png", plot = pred_type_plot, path = ".",  
-       width = 10, height = 6, dpi = 400)
-# roc, cost of FP = 1, cost of FN = 5 
-# Calculate the roc(FP: pred=1,true=0; FN:pred=0, true=1)
-roc <- calculate_roc(compare.data, 2, 1, n = 100)
-# Plot the roc, cost of FP = 1, cost of FN = 5 
-plot.roc <- plot_roc(roc, 0.5, 2, 1)
-print(plot.roc)
-ggsave(filename = "FC_plot_roc.png", plot = plot.roc, path = ".",  
-       width = 10, height = 6, dpi = 400)
-
-# out-of-sample prediction accracy
-cv_error <- cv_k(lc4)
-cv_error
-#Plot the significant value
-significant_plot <- coeff_plot1(log.f, sig = T, 0.1)
-print(significant_plot)
-#Plot the coefficient value
-coefficient_plot <- coeff_plot1(log.f, sig = F, 0.1)
-print(coefficient_plot)
-# What is the prediction for Status "Current"?
-current <- lc3 %>% subset(y == 0)
-pred.current <- predict(log.f, current, type = "response")
-```
-
-# Kernel SVM
-```{r, eval = F}
-# Prepare for kernel SVM
-lc4 <- lc4[-which(is.na(lc4$percent_bc_gt_75) | is.na(lc4$revol_util) | is.na(lc4$bc_util)),]
-
-l.kern <- svm(lc4, "rbfdot")
-l.kern
-# New data
-newdata <- as.matrix(lc4%>% select(-y))
-pred.kern <- predict(l.kern, newdata)
-###
-compare.data <- data.frame(pred = pred.kern, true = lc4$y)
-
-# in-sample prediction accuracy
-# prediction accuracy when threshold = 0.5
-pred1 = as.numeric(pred > 0.14)
-1 - sum(pred1 == lc4$y, na.rm = T)/length(pred1)
-# Prediction and true status when threshold = 0.5 plot
-kern_pred_type_plot <- plot_pred_type_distribution(compare.data, 0.5)
-kern_pred_type_plot
-ggsave(filename = "kern_pred_type.png", plot = kern_pred_type_plot, path = ".", 
-       width = 10, height = 6, dpi = 400)
-# roc, cost of FP = 1, cost of FN = 5 
-# Calculate the roc(FP: pred=1,true=0; FN:pred=0, true=1)
-roc <- calculate_roc(compare.data, 1, 5, n = 100)
-# Plot the roc, cost of FP = 1, cost of FN = 5 
-plot.roc <- plot_roc(roc, 0.5, 1, 5)
-ggsave(filename = "kern_plot_roc.png", plot = plot.roc, path = ".",  
-       width = 10, height = 6, dpi = 400)
-# in-sample prediction accuracy
-1 - sum(pred.kern == lc4$y, na.rm = T)/length(lc4$y)
-# cross validation error
-cv.kernel.error <- cv_ksvm(lc4, "vanilladot", k = 10)
-cv.kernel.error
 ```

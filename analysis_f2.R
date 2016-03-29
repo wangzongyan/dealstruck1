@@ -52,7 +52,7 @@ anova_one <- function(data, variable){
 
 # return a data frame contains the p-value for one-way ANOVA and pairwise T
 anova <- function(data){
-  p.list <- as.character(colnames(data)[1:(length(colnames(data))-1)]) %>% sapply(., function(x) anova_one(data, x))
+  p.list <- as.character(colnames(data)[colnames(data) != "loan_status"]) %>% sapply(., function(x) anova_one(data, x))
   return(p.list)
 }
 
@@ -83,7 +83,7 @@ model <- function(glm.fun, level){
 ######################
 
 ## Cross-Validation resample
-cv_k <- function(data, k = 10){
+cv_k <- function(data, k = 10, threshold = 0.5){
   flds <- createFolds(1:length(data[,1]), k = k, list = TRUE, returnTrain = FALSE)
   error <- c()
   cv.error <- c()
@@ -94,7 +94,7 @@ cv_k <- function(data, k = 10){
       train <- data[-flds[[i]],]
       log.f <- logistic(train)
       pred <- predict(log.f, test, type = "response")
-      pred1 <- as.numeric(pred >= 0.5)
+      pred1 <- as.numeric(pred >= threshold)
       error[i] <- 1- sum(pred1 == test$y, na.rm = T)/length(test$y)
     }
   cv.error <- mean(error)
@@ -134,4 +134,76 @@ cv_ksvm <- function(data, kernel = "rbfdot", k = 10){
   }
   cv.error <- mean(error)
   return(cv.error)
+}
+
+
+
+# Calculate the roc(FP: pred=1,true=0; FN:pred=0, true=1)
+calculate_roc <- function(df, cost_of_fp, cost_of_fn, n=100) {
+  tpr <- function(df, threshold) {
+    sum(df$pred >= threshold & df$true == 1, na.rm = T) / sum(df$true == 1, na.rm = T)
+  }
+  
+  fpr <- function(df, threshold) {
+    sum(df$pred >= threshold & df$true == 0, na.rm = T) / sum(df$true == 0, na.rm = T)
+  }
+  
+  cost <- function(df, threshold, cost_of_fp, cost_of_fn) {
+    sum(df$pred >= threshold & df$true == 0, na.rm = T) * cost_of_fp + 
+      sum(df$pred < threshold & df$true == 1, na.rm = T) * cost_of_fn
+  }
+  
+  roc <- data.frame(threshold = seq(0,1,length.out=n), tpr=NA, fpr=NA)
+  roc$tpr <- sapply(roc$threshold, function(th) tpr(df, th))
+  roc$fpr <- sapply(roc$threshold, function(th) fpr(df, th))
+  roc$cost <- sapply(roc$threshold, function(th) cost(df, th, cost_of_fp, cost_of_fn))
+  
+  return(roc)
+}
+
+###############################################
+### EM algorithm 
+#################################################
+
+#######################
+# regression EM
+###########################
+M_step <- function(data){
+  lc_l <- data %>% na.omit() %>% mutate(y = y1 + y2)%>%
+    select(-y1,-y2,-id)
+  # SVM
+  k <- lm(y ~., data = lc_l)
+  return(k)
+}
+E_step <- function(k, data){
+  newdata <- data%>% select(-y1,-y2, -id)
+  pred <- predict(k, newdata)
+  data$y2[data$y2 != 0] <- pred[data$y2 != 0] - data$y1[data$y2 != 0]
+  data$y2[data$y2 < 0] <- 1
+  return(data)
+}
+
+
+
+
+
+#############################################
+# Kernel regression EM
+################################
+M_step_kern <- function(data, kernel = "rbfdot"){
+  lc_svm <- data %>% na.omit() %>% mutate(y = y1 + y2)%>%
+    select(-y1,-y2,-id)
+  # SVM
+  SVM_X <- as.matrix(lc_svm %>% select(-y))
+  SVM_Y <- as.matrix(lc_svm %>% select(y))
+  
+  k <- ksvm(SVM_X, SVM_Y, kernel = kernel)
+  return(k)
+}
+E_step_kern <- function(k, data){
+  newdata <- as.matrix(data%>% select(-y1,-y2, -id))
+  pred <- predict(k, newdata)
+  data$y2[data$y2 != 0] <- pred[data$y2 != 0] - data$y1[data$y2 != 0]
+  data$y2[data$y2 < 0] <- 1
+  return(data)
 }

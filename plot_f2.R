@@ -38,11 +38,8 @@ lc_ratio <- function(data, status = "Fully_Paid"){
 
 
 # get the abbreviation and full name online
-URL <- "http://state.1keydata.com/state-abbreviations.php"
-tables = readHTMLTable(URL, stringsAsFactors = FALSE)
-list <- tables[[2]]
-list <- data.frame(full = c(list$V1, list$V3), abb = c(list$V2, list$V4))
-state <- list[-27, ][-1, ]
+list <- data.frame(full = state.name, abb = state.abb)
+state <- list
 row.names(state) <- 1 : length(state[,1])
 
 
@@ -159,4 +156,56 @@ coeff_plot1 <- function(log.f, sig = F, sig.value = 0.1){
   return(myplot)
 }
 
+### ROC curve
+# Plot the prediction status with particular threshold
+plot_pred_type_distribution <- function(df, threshold) {
+  test_that("Cannot find \"pred\" or \"true\" in the data frame provided",{
+    expect_equal(is.null(df$pred), F)
+    expect_equal(is.null(df$true), F)
+  })
+  v <- rep(NA, nrow(df))
+  v <- ifelse(df$pred >= threshold & df$true == 1, "pred=1,true=1", v) # TP
+  v <- ifelse(df$pred >= threshold & df$true == 0, "pred=1,true=0", v) #FP
+  v <- ifelse(df$pred < threshold & df$true == 1, "pred=0,true=1", v) #FN
+  v <- ifelse(df$pred < threshold & df$true == 0, "pred=0,true=0", v) #TN
+  
+  df$pred_type <- v
+  
+  ggplot(data=df, aes(x=true, y=pred)) + 
+    geom_violin(fill=rgb(1,1,1,alpha=0.6), color=NA) + 
+    geom_jitter(aes(color=pred_type), alpha=0.6) +
+    geom_hline(yintercept=threshold, color="red", alpha=0.6) +
+    scale_color_discrete(name = "type") +
+    labs(title=sprintf("Threshold at %.2f", threshold))
+}
 
+
+# plot roc
+plot_roc <- function(roc, threshold, cost_of_fp, cost_of_fn) {
+    norm_vec <- function(v) (v - min(v))/diff(range(v))
+  
+  idx_threshold = which.min(abs(roc$threshold-threshold))
+  
+  col_ramp <- colorRampPalette(c("green","orange","red","black"))(100)
+  col_by_cost <- col_ramp[ceiling(norm_vec(roc$cost)*99)+1]
+  p_roc <- ggplot(roc, aes(fpr,tpr)) + 
+    geom_line(color=rgb(0,0,1,alpha=0.3)) +
+    geom_point(color=col_by_cost, size=4, alpha=0.5) +
+    coord_fixed() +
+    geom_line(aes(threshold,threshold), color=rgb(0,0,1,alpha=0.5)) +
+    labs(title = sprintf("ROC")) + xlab("FPR") + ylab("TPR") +
+    geom_hline(yintercept=roc[idx_threshold,"tpr"], alpha=0.5, linetype="dashed") +
+    geom_vline(xintercept=roc[idx_threshold,"fpr"], alpha=0.5, linetype="dashed")
+  
+  p_cost <- ggplot(roc, aes(threshold, cost)) +
+    geom_line(color=rgb(0,0,1,alpha=0.3)) +
+    geom_point(color=col_by_cost, size=4, alpha=0.5) +
+    labs(title = sprintf("cost function")) +
+    geom_vline(xintercept=threshold, alpha=0.5, linetype="dashed")
+  
+  sub_title <- sprintf("threshold at %.2f - cost of FP = %d, cost of FN = %d", threshold, cost_of_fp, cost_of_fn)
+  
+  myplot <- grid.arrange(p_roc, p_cost, ncol=2)
+  return(myplot)
+  
+}
