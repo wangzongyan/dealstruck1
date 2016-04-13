@@ -70,7 +70,7 @@ lc36 <- lc36[!is.na(lc36$y1),] # One data missing y1
 # Use the EM algorithm to classify current and potential delinquency events(linear regression)
 ```{r}
 lc_em1 <- lc36
-for (i in 1:10){
+for (i in 1:20){
   k <- M_step(lc_em1)
   lc_em1 <- E_step(k,lc_em1)
 }
@@ -98,7 +98,7 @@ ggsave(filename = "censorlm.png", plot = censorlm_plot, path = ".",
 # Use the EM algorithm to classify current and potential delinquency events(kernel SVM)
 ```{r}
 lc_em2 <- lc36
-for (i in 1:10){
+for (i in 1:20){
   k <- M_step_kern(lc_em2, kernel = "rbfdot")
   lc_em2 <- E_step_kern(k,lc_em2)
 }
